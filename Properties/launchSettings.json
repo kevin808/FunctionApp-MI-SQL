@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "FunctionApp_MI_SQL": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7219",
+      "launchBrowser": false
+    }
+  }
+}
