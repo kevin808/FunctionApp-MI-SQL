@@ -15,8 +15,7 @@ namespace FunctionApp_MI_SQL
         {
             log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
 
-            string sqlServerName = Environment.GetEnvironmentVariable("SqlServerName");
-            string databaseName = Environment.GetEnvironmentVariable("DatabaseName");
+            string SqlConnectionString = Environment.GetEnvironmentVariable("SqlConnectionString");
             string userAssignedClientId = Environment.GetEnvironmentVariable("UserAssignedClientId");
 
             try
@@ -25,20 +24,46 @@ namespace FunctionApp_MI_SQL
                 string accessToken = await GetAccessTokenAsync(userAssignedClientId);
 
                 // Create connection string using access token
-                string connectionString = $"Data Source={sqlServerName};Initial Catalog={databaseName};Authentication=ActiveDirectoryMsi";
+                string connectionString = SqlConnectionString;
 
-                // Connect to SQL Server and execute query
+                // Connect to SQL Server and execute queries
                 using (var connection = new SqlConnection(connectionString))
                 {
                     connection.AccessToken = accessToken;
                     await connection.OpenAsync();
 
-                    // Example query
-                    string query = "SELECT COUNT(*) FROM dbo.users";
-                    using (var command = new SqlCommand(query, connection))
+                    // Create table if it doesn't exist
+                    string createTableQuery = @"
+                    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='newusers' AND xtype='U')
+                    BEGIN
+                        CREATE TABLE newusers (
+                            id INT PRIMARY KEY IDENTITY(1,1),
+                            username VARCHAR(50) NOT NULL,
+                            email VARCHAR(100) NOT NULL,
+                            created_at DATETIME DEFAULT GETDATE()
+                        );
+                    END";
+
+                    using (var createTableCommand = new SqlCommand(createTableQuery, connection))
                     {
-                        int count = (int)await command.ExecuteScalarAsync();
-                        log.LogInformation($"Number of records in YourTable: {count}");
+                        await createTableCommand.ExecuteNonQueryAsync();
+                        log.LogInformation("Table 'newusers' created or already exists.");
+                    }
+
+                    // Insert data
+                    string insertQuery = "INSERT INTO newusers (username, email) VALUES ('john_doe', 'john@example.com')";
+                    using (var insertCommand = new SqlCommand(insertQuery, connection))
+                    {
+                        await insertCommand.ExecuteNonQueryAsync();
+                        log.LogInformation("Inserted a new user into the 'newusers' table.");
+                    }
+
+                    // Select data
+                    string selectQuery = "SELECT COUNT(*) FROM newusers";
+                    using (var selectCommand = new SqlCommand(selectQuery, connection))
+                    {
+                        int count = (int)await selectCommand.ExecuteScalarAsync();
+                        log.LogInformation($"Number of records in 'newusers' table: {count}");
                     }
                 }
             }
